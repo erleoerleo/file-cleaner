@@ -2,6 +2,8 @@ import { ShapefileProcessor } from './shapefile.js'
 import { ImageProcessor } from './image.js'
 import { PdfProcessor } from './pdf.js'
 import { OfficeProcessor } from './office.js'
+import { VideoProcessor } from './video.js'
+import { AudioProcessor } from './audio.js'
 
 /**
  * Plugin registry. To add support for a new file type:
@@ -13,6 +15,8 @@ const PROCESSORS = [
   new ImageProcessor(),
   new PdfProcessor(),
   new OfficeProcessor(),
+  new VideoProcessor(),
+  new AudioProcessor(),
 ]
 
 /** Returns the first processor that handles the given filename's extension, or null. */

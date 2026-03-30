@@ -65,8 +65,26 @@ export default function App() {
         file.name,
         [...selectedKeys]
       )
-      // Trigger browser download
-      const blob = new Blob([bytes], { type: 'application/zip' })
+      // Trigger browser download — MIME type must match the actual file or browsers append .zip
+      const MIME = {
+        '.zip': 'application/zip',
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.tif': 'image/tiff', '.tiff': 'image/tiff',
+        '.webp': 'image/webp',
+        '.pdf': 'application/pdf',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        '.mp4': 'video/mp4',
+        '.mov': 'video/quicktime',
+        '.m4v': 'video/x-m4v',
+        '.mp3': 'audio/mpeg',
+        '.flac': 'audio/flac',
+        '.m4a': 'audio/mp4',
+      }
+      const ext = filename.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? ''
+      const blob = new Blob([bytes], { type: MIME[ext] ?? 'application/octet-stream' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -184,6 +202,8 @@ export default function App() {
                   <li><strong>Images</strong> — .jpg .jpeg .png .tif .tiff .webp</li>
                   <li><strong>PDF</strong> — .pdf</li>
                   <li><strong>Office</strong> — .docx .xlsx .pptx</li>
+                  <li><strong>Video</strong> — .mp4 .mov .m4v</li>
+                  <li><strong>Audio</strong> — .mp3 .flac .m4a</li>
                 </ul>
               </div>
               <div className="info-card">

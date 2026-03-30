@@ -30,6 +30,8 @@ export default function DropZone({ onFile }) {
     'Images (.jpg .png .tif)',
     'PDF',
     'Office (.docx .xlsx .pptx)',
+    'Video (.mp4 .mov)',
+    'Audio (.mp3 .flac .m4a)',
   ].join('  ·  ')
 
   return (
