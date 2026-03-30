@@ -1,6 +1,7 @@
 export class MetadataField {
-  constructor({ key, value, category, removable = true, sourceFile = '' }) {
+  constructor({ key, value, category, removable = true, sourceFile = '', label = '' }) {
     this.key = key
+    this.label = label || key   // human-readable name, falls back to key
     this.value = value
     this.category = category
     this.removable = removable
