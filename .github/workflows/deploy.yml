@@ -1,44 +1,62 @@
+# The display name for this workflow — shown in the GitHub Actions tab
 name: Deploy to GitHub Pages
 
+# "on" defines what events trigger this workflow
 on:
   push:
-    branches: [main]
-  workflow_dispatch: # allows manual trigger from GitHub UI
+    branches: [main]   # Run automatically whenever code is pushed to the main branch
+  workflow_dispatch:   # Also allow manually clicking "Run workflow" in the GitHub UI
 
+# Permissions this workflow needs on the repository.
+# GitHub Actions runs with a temporary token — you must explicitly grant what it can do.
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: read   # Allowed to read the repo files (for checkout)
+  pages: write     # Allowed to write/publish to GitHub Pages
+  id-token: write  # Required by the deploy action to prove its identity to GitHub's Pages API
 
+# Prevent two deployments running at the same time (e.g. two quick pushes back-to-back).
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: pages           # All runs in this group queue up and share this lock
+  cancel-in-progress: true  # If a new push comes in, cancel the currently running deploy
 
+# "jobs" is the list of things to actually do. Each job runs on its own virtual machine.
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+  build-and-deploy:          # The job's ID — can be anything, referenced by other jobs
+    runs-on: ubuntu-latest   # Spin up a fresh Ubuntu Linux virtual machine for this job
     environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      name: github-pages     # Tells GitHub this job targets the "github-pages" environment
+      url: ${{ steps.deployment.outputs.page_url }}  # Shows the live URL in the GitHub UI when done
+
+    # "steps" are the individual commands that run in order on the VM
     steps:
+      # Check out your repository code onto the VM so the next steps can see your files
       - uses: actions/checkout@v4
 
+      # Install Node.js on the VM. "cache: npm" caches node_modules between runs to speed things up
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: 20   # Use Node 20 (LTS)
+          cache: npm         # Cache the npm dependency cache folder between workflow runs
 
+      # Install exact dependency versions from package-lock.json.
+      # "ci" (clean install) is stricter than "npm install" — fails if lock file is out of date
       - name: Install dependencies
         run: npm ci
 
+      # Run "npm run build" which calls Vite — compiles React + JS into static files in /dist
       - name: Build
         run: npm run build
 
+      # Prepares the GitHub Pages environment and validates the configuration
       - uses: actions/configure-pages@v4
 
+      # Zips up the /dist folder and uploads it as a special Pages artifact
+      # GitHub Pages will serve files from exactly this artifact
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: dist   # The folder Vite built into — this becomes your website root
 
+      # Takes the uploaded artifact and publishes it to GitHub Pages.
+      # "id: deployment" gives this step a name so the URL above (${{ steps.deployment... }}) can reference it
       - uses: actions/deploy-pages@v4
         id: deployment

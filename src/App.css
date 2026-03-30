@@ -85,6 +85,26 @@
 .app-header__tagline {
   color: var(--text-muted);
   font-size: 13px;
+  flex: 1; /* push GitHub link to far right */
+}
+
+.app-header__github {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 13px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.app-header__github:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
 }
 
 /* ─── Main ──────────────────────────────────────────────────────────────────── */
