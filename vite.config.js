@@ -9,10 +9,10 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-pdf': ['pdf-lib'],
-          'vendor-exifr': ['exifr'],
-          'vendor-jszip': ['jszip'],
+        manualChunks: (id) => {
+          if (id.includes('pdf-lib'))  return 'vendor-pdf'
+          if (id.includes('exifr'))    return 'vendor-exifr'
+          if (id.includes('jszip'))    return 'vendor-jszip'
         },
       },
     },
