@@ -5,6 +5,9 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]   # Run automatically whenever code is pushed to the main branch
+    paths-ignore:
+      - 'test-data/**'  # Changes inside test-data/ never trigger a deploy
+      - 'README.md'     # Docs-only changes don't need a redeploy either
   workflow_dispatch:   # Also allow manually clicking "Run workflow" in the GitHub UI
 
 # Permissions this workflow needs on the repository.
