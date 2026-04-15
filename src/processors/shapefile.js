@@ -35,7 +35,7 @@ const SENSITIVE_XML_PATHS = {
   ],
 }
 
-const DBF_SENSITIVE_PATTERN = /[/\\]|path|dir|file|user|author/i
+const DBF_SENSITIVE_PATTERN = /[/\\]|path|dir|file|user|author|custodian|operator|owner|contact|email/i
 
 /**
  * Convert a Python-style ElementTree XPath ('.//foo' or './/foo/bar')
@@ -121,28 +121,117 @@ function scrubXml(xmlText, relevantKeys) {
 }
 
 /**
- * Scan DBF header bytes for field names that look like paths or personal data.
- * DBF spec: field descriptors start at byte 32, each descriptor is 32 bytes,
- * terminated by 0x0D.
+ * Parse all field descriptors from a DBF header.
+ * DBF spec: field descriptors start at byte 32, each 32 bytes, terminated by 0x0D.
+ * Returns [{ name, type, length, decimal }]
  */
-function scanDbfFields(arrayBuffer) {
+function parseDbfFields(arrayBuffer) {
   const view = new Uint8Array(arrayBuffer)
-  const sensitiveFields = []
+  const dv = new DataView(arrayBuffer instanceof ArrayBuffer ? arrayBuffer : arrayBuffer.buffer)
+  const headerSize  = dv.getInt16(8, true)
+  const recordSize  = dv.getInt16(10, true)
+  const recordCount = dv.getInt32(4, true)
+
+  const fields = []
   let offset = 32
   while (offset + 32 <= view.length && view[offset] !== 0x0D) {
-    // Field name: bytes [offset, offset+11), null-terminated ASCII
     let name = ''
     for (let i = offset; i < offset + 11; i++) {
       if (view[i] === 0) break
       name += String.fromCharCode(view[i])
     }
     name = name.trim()
-    if (name && DBF_SENSITIVE_PATTERN.test(name)) {
-      sensitiveFields.push(name)
+    if (name) {
+      fields.push({
+        name,
+        type:    String.fromCharCode(view[offset + 11]),
+        length:  view[offset + 16],
+        decimal: view[offset + 17],
+      })
     }
     offset += 32
   }
-  return sensitiveFields
+
+  // Read up to 200 records to collect sample values per field
+  const dec = new TextDecoder('latin1')
+  const samples = Object.fromEntries(fields.map(f => [f.name, new Set()]))
+  const limit = Math.min(recordCount, 200)
+
+  for (let r = 0; r < limit; r++) {
+    const base = headerSize + r * recordSize
+    if (view[base] === 0x2A) continue  // deleted record
+    let fieldOffset = 1
+    for (const f of fields) {
+      const raw = dec.decode(view.subarray(base + fieldOffset, base + fieldOffset + f.length)).trim()
+      if (raw) samples[f.name].add(raw)
+      fieldOffset += f.length
+    }
+  }
+
+  // Attach sorted unique sample values to each field descriptor
+  for (const f of fields) {
+    f.samples = [...samples[f.name]].slice(0, 8)
+  }
+
+  return fields
+}
+
+/**
+ * Rewrite a DBF file removing the specified columns by name.
+ * Rewrites both the header descriptors and every data record.
+ */
+function removeDbfColumns(arrayBuffer, columnsToRemove) {
+  const removeSet = new Set(columnsToRemove.map(c => c.toUpperCase()))
+  const view = new Uint8Array(arrayBuffer)
+  const dv = new DataView(arrayBuffer instanceof ArrayBuffer ? arrayBuffer : arrayBuffer.buffer)
+
+  const recordCount  = dv.getInt32(4, true)
+  const oldHeaderSize = dv.getInt16(8, true)
+  const oldRecordSize = dv.getInt16(10, true)
+
+  const allFields  = parseDbfFields(arrayBuffer)
+  const keepFields = allFields.filter(f => !removeSet.has(f.name.toUpperCase()))
+
+  const newHeaderSize = 32 + keepFields.length * 32 + 1  // +1 for 0x0D terminator
+  const newRecordSize = 1 + keepFields.reduce((s, f) => s + f.length, 0)  // +1 for deletion flag
+  const out = new Uint8Array(newHeaderSize + recordCount * newRecordSize)
+  const outDv = new DataView(out.buffer)
+
+  // Copy version + date bytes
+  out[0] = view[0]; out[1] = view[1]; out[2] = view[2]; out[3] = view[3]
+  outDv.setInt32(4,  recordCount,   true)
+  outDv.setInt16(8,  newHeaderSize, true)
+  outDv.setInt16(10, newRecordSize, true)
+
+  // Write kept field descriptors
+  const enc = new TextEncoder()
+  keepFields.forEach((f, i) => {
+    const base = 32 + i * 32
+    const nameBytes = enc.encode(f.name)
+    for (let j = 0; j < 11; j++) out[base + j] = nameBytes[j] ?? 0
+    out[base + 11] = f.type.charCodeAt(0)
+    out[base + 16] = f.length
+    out[base + 17] = f.decimal
+  })
+  out[newHeaderSize - 1] = 0x0D  // terminator
+
+  // Rewrite each record, skipping removed columns
+  for (let r = 0; r < recordCount; r++) {
+    const srcBase = oldHeaderSize + r * oldRecordSize
+    const dstBase = newHeaderSize + r * newRecordSize
+    out[dstBase] = view[srcBase]  // deletion flag
+
+    let srcOff = 1, dstOff = 1
+    for (const f of allFields) {
+      if (!removeSet.has(f.name.toUpperCase())) {
+        out.set(view.subarray(srcBase + srcOff, srcBase + srcOff + f.length), dstBase + dstOff)
+        dstOff += f.length
+      }
+      srcOff += f.length
+    }
+  }
+
+  return out
 }
 
 export class ShapefileProcessor extends BaseProcessor {
@@ -204,18 +293,22 @@ export class ShapefileProcessor extends BaseProcessor {
         prjByContent[text].push(name)
       } else if (lower.endsWith('.dbf')) {
         const buf = await entry.async('arraybuffer')
-        const sensitiveFields = scanDbfFields(buf)
-        for (const fieldName of sensitiveFields) {
+        const fields = parseDbfFields(buf)
+        for (const { name: fieldName, samples } of fields) {
+          const sensitive = DBF_SENSITIVE_PATTERN.test(fieldName)
+          const preview = samples.length > 0 ? samples.join(', ') : '(empty)'
           result.metadata.push(new MetadataField({
             key: `dbf_field:${name}:${fieldName}`,
-            value: fieldName,
-            category: 'path',
-            removable: false,
+            value: preview,
+            category: sensitive ? 'path' : 'custom',
+            removable: true,
             sourceFile: name,
           }))
-          result.warnings.push(
-            `DBF column "${fieldName}" in ${name} may contain sensitive data — manual review recommended before sharing.`
-          )
+          if (sensitive) {
+            result.warnings.push(
+              `DBF column "${fieldName}" in ${name} may contain sensitive data.`
+            )
+          }
         }
       }
     }
@@ -255,6 +348,16 @@ export class ShapefileProcessor extends BaseProcessor {
         if (relevantKeys.length > 0) {
           const xmlText = await entry.async('string')
           data = scrubXml(xmlText, relevantKeys)
+        } else {
+          data = await entry.async('uint8array')
+        }
+      } else if (lower.endsWith('.dbf')) {
+        const colsToRemove = [...keysSet]
+          .filter(k => k.startsWith(`dbf_field:${name}:`))
+          .map(k => k.split(':')[2])
+        if (colsToRemove.length > 0) {
+          const buf = await entry.async('arraybuffer')
+          data = removeDbfColumns(buf, colsToRemove)
         } else {
           data = await entry.async('uint8array')
         }
