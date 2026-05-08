@@ -38,6 +38,12 @@ export default function MetadataPanel({ result, selectedKeys, onToggle }) {
 
   return (
     <div className="metadata-panel">
+      <div className="metadata-panel__hint">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        Checked fields are kept — uncheck to remove
+      </div>
       <div className="metadata-panel__scroll">
         {orderedCategories.map(category => (
           <MetadataGroup

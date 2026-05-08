@@ -55,15 +55,20 @@ export default function App() {
   const clearSelection = useCallback(() => setSelectedKeys(new Set()), [])
 
   const handleClean = useCallback(async () => {
-    if (!fileBytes || !file || selectedKeys.size === 0) return
+    if (!fileBytes || !file || !result) return
+    const keysToRemoveCount = result.metadata.filter(f => f.removable && !selectedKeys.has(f.key)).length
+    if (keysToRemoveCount === 0) return
     setStatus('cleaning')
 
     try {
       const processor = getProcessor(file.name)
+      const keysToRemove = result.metadata
+        .filter(f => f.removable && !selectedKeys.has(f.key))
+        .map(f => f.key)
       const { bytes, filename } = await processor.stripMetadata(
         fileBytes,
         file.name,
-        [...selectedKeys]
+        keysToRemove
       )
       // Trigger browser download — MIME type must match the actual file or browsers append .zip
       const MIME = {

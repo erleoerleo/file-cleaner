@@ -399,6 +399,17 @@
 .metadata-panel--empty svg { opacity: 0.4; }
 .metadata-panel--empty .hint { font-size: 12px; color: var(--text-dim); }
 
+.metadata-panel__hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 11px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
 .metadata-panel__scroll {
   flex: 1;
   min-height: 0; /* prevent flex child from expanding past panel bounds */
@@ -494,8 +505,8 @@
 
 .metadata-item:last-child { border-bottom: none; }
 .metadata-item:hover { background: var(--surface2); }
-.metadata-item--selected { background: var(--accent-dim); }
-.metadata-item--selected:hover { background: rgba(110, 118, 229, 0.22); }
+.metadata-item--to-remove { background: rgba(248, 81, 73, 0.08); }
+.metadata-item--to-remove:hover { background: rgba(248, 81, 73, 0.14); }
 
 .metadata-item__check {
   padding-top: 2px;

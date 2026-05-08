@@ -31,14 +31,14 @@ export default function MetadataItem({ field, isSelected, onToggle }) {
   const sourceName = field.sourceFile.split('/').pop().split('\\').pop()
 
   return (
-    <div className={`metadata-item${isSelected ? ' metadata-item--selected' : ''}`}>
+    <div className={`metadata-item${!isSelected && field.removable ? ' metadata-item--to-remove' : ''}`}>
       <div className="metadata-item__check">
         {field.removable ? (
           <input
             type="checkbox"
             checked={isSelected}
             onChange={() => onToggle(field.key)}
-            aria-label={`Remove ${fieldName}`}
+            aria-label={`Keep ${fieldName}`}
           />
         ) : (
           <span className="lock-icon" title="Cannot be removed automatically">

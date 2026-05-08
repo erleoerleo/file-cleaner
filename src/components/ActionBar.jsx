@@ -2,21 +2,22 @@ export default function ActionBar({ result, selectedKeys, onSelectAllRemovable, 
   if (!result || result.error) return null
 
   const removable = result.metadata.filter(f => f.removable)
-  const selectedCount = [...selectedKeys].filter(k => removable.some(f => f.key === k)).length
+  const keptCount = removable.filter(f => selectedKeys.has(f.key)).length
+  const toRemoveCount = removable.length - keptCount
   const isCleaning = status === 'cleaning'
 
   return (
     <div className="action-bar">
       <div className="action-bar__left">
-        <button className="btn btn--ghost btn--sm" onClick={onSelectAllRemovable} disabled={isCleaning}>
-          Select all removable
+        <button className="btn btn--ghost btn--sm" onClick={onSelectAllRemovable} disabled={isCleaning || keptCount === removable.length}>
+          Keep all
         </button>
-        <button className="btn btn--ghost btn--sm" onClick={onClearSelection} disabled={isCleaning || selectedCount === 0}>
-          Clear selection
+        <button className="btn btn--ghost btn--sm" onClick={onClearSelection} disabled={isCleaning || toRemoveCount === removable.length}>
+          Remove all
         </button>
-        {selectedCount > 0 && (
+        {toRemoveCount > 0 && (
           <span className="selection-count">
-            {selectedCount} field{selectedCount !== 1 ? 's' : ''} selected
+            {toRemoveCount} field{toRemoveCount !== 1 ? 's' : ''} will be removed
           </span>
         )}
       </div>
@@ -24,7 +25,7 @@ export default function ActionBar({ result, selectedKeys, onSelectAllRemovable, 
         <button
           className="btn btn--primary"
           onClick={onClean}
-          disabled={selectedCount === 0 || isCleaning}
+          disabled={toRemoveCount === 0 || isCleaning}
         >
           {isCleaning ? (
             <>
