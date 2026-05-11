@@ -1,9 +1,7 @@
 import { useState } from 'react'
 
-/** Derive a human-readable field name from the metadata key. */
 function getFieldName(key) {
   if (key.startsWith('xml:')) {
-    // xml:{sourceFile}:{xpath}  →  last segment of xpath
     const parts = key.split(':')
     const xpath = parts.slice(2).join(':')
     const segments = xpath.split('/')
@@ -23,11 +21,7 @@ export default function MetadataItem({ field, isSelected, onToggle }) {
   const [expanded, setExpanded] = useState(false)
   const fieldName = getFieldName(field.key)
   const isLong = field.value.length > 80
-  const displayValue = isLong && !expanded
-    ? field.value.slice(0, 80) + '…'
-    : field.value
-
-  // Derive short source label (basename of the path)
+  const displayValue = isLong && !expanded ? field.value.slice(0, 80) + '…' : field.value
   const sourceName = field.sourceFile.split('/').pop().split('\\').pop()
 
   return (
@@ -57,10 +51,7 @@ export default function MetadataItem({ field, isSelected, onToggle }) {
         <div className="metadata-item__value">
           <span className="field-value">{displayValue}</span>
           {isLong && (
-            <button
-              className="expand-btn"
-              onClick={() => setExpanded(v => !v)}
-            >
+            <button className="expand-btn" onClick={() => setExpanded(v => !v)}>
               {expanded ? 'collapse' : 'expand'}
             </button>
           )}
