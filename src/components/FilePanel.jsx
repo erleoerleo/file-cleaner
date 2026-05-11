@@ -5,9 +5,7 @@ function formatBytes(n) {
 }
 
 export default function FilePanel({ file, result, status, onReset }) {
-  const removableCount = result
-    ? result.metadata.filter(f => f.removable).length
-    : 0
+  const removableCount = result ? result.metadata.filter(f => f.removable).length : 0
   const totalCount = result ? result.metadata.length : 0
 
   return (

@@ -1,18 +1,34 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import DropZone from './components/DropZone.jsx'
 import FilePanel from './components/FilePanel.jsx'
 import MetadataPanel from './components/MetadataPanel.jsx'
 import ActionBar from './components/ActionBar.jsx'
 import { getProcessor } from './processors/index.js'
 
+function getInitialTheme() {
+  const stored = localStorage.getItem('theme')
+  if (stored) return stored
+  return 'dark'
+}
+
 export default function App() {
   const [file, setFile] = useState(null)
   const [fileBytes, setFileBytes] = useState(null)
   const [result, setResult] = useState(null)
   const [selectedKeys, setSelectedKeys] = useState(new Set())
-  const [status, setStatus] = useState('idle') // idle | processing | ready | cleaning
+  const [status, setStatus] = useState('idle')
   const [workspaceDragOver, setWorkspaceDragOver] = useState(false)
+  const [theme, setTheme] = useState(getInitialTheme)
   const dragCounter = useRef(0)
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-color-scheme', theme)
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  const toggleTheme = useCallback(() => {
+    setTheme(t => t === 'dark' ? 'light' : 'dark')
+  }, [])
 
   const handleFile = useCallback(async (f, bytes) => {
     setFile(f)
@@ -31,7 +47,6 @@ export default function App() {
     try {
       const res = await processor.extractMetadata(bytes, f.name)
       setResult(res)
-      // Auto-select all removable fields
       setSelectedKeys(new Set(res.metadata.filter(m => m.removable).map(m => m.key)))
     } catch (err) {
       setResult({ metadata: [], warnings: [], error: `Processing failed: ${err.message}` })
@@ -65,12 +80,7 @@ export default function App() {
       const keysToRemove = result.metadata
         .filter(f => f.removable && !selectedKeys.has(f.key))
         .map(f => f.key)
-      const { bytes, filename } = await processor.stripMetadata(
-        fileBytes,
-        file.name,
-        keysToRemove
-      )
-      // Trigger browser download — MIME type must match the actual file or browsers append .zip
+      const { bytes, filename } = await processor.stripMetadata(fileBytes, file.name, keysToRemove)
       const MIME = {
         '.zip': 'application/zip',
         '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
@@ -102,12 +112,11 @@ export default function App() {
     setStatus('ready')
   }, [fileBytes, file, selectedKeys])
 
-  // hasFile ref so drag callbacks can read it without re-registering
   const hasFileRef = useRef(false)
   hasFileRef.current = file !== null
 
   const handleAppDragEnter = useCallback((e) => {
-    if (!hasFileRef.current) return // landing page DropZone handles its own drag
+    if (!hasFileRef.current) return
     if (!e.dataTransfer.types.includes('Files')) return
     e.preventDefault()
     dragCounter.current++
@@ -117,7 +126,7 @@ export default function App() {
   const handleAppDragOver = useCallback((e) => {
     if (!hasFileRef.current) return
     if (!e.dataTransfer.types.includes('Files')) return
-    e.preventDefault() // required to allow drop
+    e.preventDefault()
   }, [])
 
   const handleAppDragLeave = useCallback((e) => {
@@ -177,21 +186,45 @@ export default function App() {
             <span>Client Side File Cleaner</span>
           </div>
           <div className="app-header__tagline">
-            Strip sensitive metadata from files before sharing with external parties — 100% in your browser
+            Strip sensitive metadata from files before sharing — 100% in your browser
           </div>
-          <a
-            className="app-header__github"
-            href="https://github.com/erleoerleo/file-cleaner"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="View source on GitHub"
-          >
-            {/* GitHub mark SVG */}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.477 2 2 6.484 2 12.021c0 4.428 2.865 8.185 6.839 9.504.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.339-2.221-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.026 2.747-1.026.546 1.378.202 2.397.1 2.65.64.7 1.028 1.595 1.028 2.688 0 3.848-2.337 4.695-4.566 4.944.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.744 0 .267.18.579.688.481C19.138 20.203 22 16.447 22 12.021 22 6.484 17.523 2 12 2z" />
-            </svg>
-            <span>Open source</span>
-          </a>
+          <div className="app-header__actions">
+            <button
+              className="btn btn--ghost btn--icon"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="5"/>
+                  <line x1="12" y1="1" x2="12" y2="3"/>
+                  <line x1="12" y1="21" x2="12" y2="23"/>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                  <line x1="1" y1="12" x2="3" y2="12"/>
+                  <line x1="21" y1="12" x2="23" y2="12"/>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+              )}
+            </button>
+            <a
+              className="app-header__github"
+              href="https://github.com/erleoerleo/file-cleaner"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="View source on GitHub"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.477 2 2 6.484 2 12.021c0 4.428 2.865 8.185 6.839 9.504.5.092.682-.217.682-.482 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.339-2.221-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.026 2.747-1.026.546 1.378.202 2.397.1 2.65.64.7 1.028 1.595 1.028 2.688 0 3.848-2.337 4.695-4.566 4.944.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.744 0 .267.18.579.688.481C19.138 20.203 22 16.447 22 12.021 22 6.484 17.523 2 12 2z" />
+              </svg>
+              <span>Open source</span>
+            </a>
+          </div>
         </div>
       </header>
 
@@ -235,12 +268,7 @@ export default function App() {
         ) : (
           <div className="workspace">
             <div className="workspace__left">
-              <FilePanel
-                file={file}
-                result={result}
-                status={status}
-                onReset={handleReset}
-              />
+              <FilePanel file={file} result={result} status={status} onReset={handleReset} />
             </div>
             <div className="workspace__right">
               {status === 'processing' ? (
@@ -249,11 +277,7 @@ export default function App() {
                   <p>Scanning metadata…</p>
                 </div>
               ) : (
-                <MetadataPanel
-                  result={result}
-                  selectedKeys={selectedKeys}
-                  onToggle={toggleKey}
-                />
+                <MetadataPanel result={result} selectedKeys={selectedKeys} onToggle={toggleKey} />
               )}
             </div>
           </div>
